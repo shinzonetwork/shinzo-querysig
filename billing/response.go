@@ -18,12 +18,12 @@ import (
 // The accounting service recovers the host from the signature. RespondedAt is in
 // unix seconds; ResponseCidsHash commits to the source documents the host read.
 type QueryResponse struct {
-	QueryHash        [32]byte
+	QueryHash        [hashSize]byte
 	Host             common.Address
 	Pool             common.Address
 	RowsQueried      uint64
 	RespondedAt      uint64
-	ResponseCidsHash [32]byte
+	ResponseCidsHash [hashSize]byte
 }
 
 // SignQueryResponse signs resp for chainID with priv and returns a 65-byte
@@ -37,24 +37,24 @@ func SignQueryResponse(chainID uint64, priv *ecdsa.PrivateKey, resp QueryRespons
 	if err != nil {
 		return nil, fmt.Errorf("sign query response: %w", err)
 	}
-	sig[64] += 27
+	sig[sigSize-1] += sigVOffset
 	return sig, nil
 }
 
 // RecoverQueryResponse returns the host address that signed resp for chainID. It
 // accepts a recovery id of 27/28 or 0/1.
 func RecoverQueryResponse(chainID uint64, resp QueryResponse, sig []byte) (common.Address, error) {
-	if len(sig) != 65 {
+	if len(sig) != sigSize {
 		return common.Address{}, fmt.Errorf("signature must be 65 bytes, got %d", len(sig))
 	}
 	digest, err := responseDigest(chainID, resp)
 	if err != nil {
 		return common.Address{}, err
 	}
-	normalized := make([]byte, 65)
+	normalized := make([]byte, sigSize)
 	copy(normalized, sig)
-	if normalized[64] >= 27 {
-		normalized[64] -= 27
+	if normalized[sigSize-1] >= sigVOffset {
+		normalized[sigSize-1] -= sigVOffset
 	}
 	pub, err := crypto.SigToPub(digest, normalized)
 	if err != nil {
@@ -67,10 +67,10 @@ func RecoverQueryResponse(chainID uint64, resp QueryResponse, sig []byte) (commo
 // joined by newline. CIDs carry no newline, so the encoding is unambiguous; the
 // host and accounting service must use this same encoding. The empty set hashes
 // to a fixed value, so a v1 record with no CIDs is still well-defined.
-func ResponseCidsHash(cids []string) [32]byte {
+func ResponseCidsHash(cids []string) [hashSize]byte {
 	sorted := append([]string(nil), cids...)
 	sort.Strings(sorted)
-	var out [32]byte
+	var out [hashSize]byte
 	copy(out[:], crypto.Keccak256([]byte(strings.Join(sorted, "\n"))))
 	return out
 }

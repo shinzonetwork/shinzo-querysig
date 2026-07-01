@@ -15,7 +15,7 @@ import (
 // signature, so a verifier can recover the signer. It errors if any field is
 // malformed (bad hex, wrong length).
 func (e Extensions) Request() (QueryRequest, []byte, error) {
-	queryHash, err := decodeBytes32(e.QueryHash)
+	queryHash, err := decodeHashBytes(e.QueryHash)
 	if err != nil {
 		return QueryRequest{}, nil, fmt.Errorf("query_hash: %w", err)
 	}
@@ -72,16 +72,16 @@ func CheckFreshness(timestamp uint64, now time.Time, maxAge time.Duration) error
 	return nil
 }
 
-// decodeBytes32 decodes a 0x-prefixed hex value and requires exactly 32 bytes.
-func decodeBytes32(s string) ([32]byte, error) {
+// decodeHashBytes decodes a 0x-prefixed hex value and requires exactly 32 bytes.
+func decodeHashBytes(s string) ([hashSize]byte, error) {
 	b, err := hexutil.Decode(s)
 	if err != nil {
-		return [32]byte{}, err
+		return [hashSize]byte{}, err
 	}
-	if len(b) != 32 {
-		return [32]byte{}, fmt.Errorf("expected 32 bytes, got %d", len(b))
+	if len(b) != hashSize {
+		return [hashSize]byte{}, fmt.Errorf("expected 32 bytes, got %d", len(b))
 	}
-	var out [32]byte
+	var out [hashSize]byte
 	copy(out[:], b)
 	return out, nil
 }
