@@ -21,11 +21,15 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+const maxSafeIntegerBits = 53
+
 // maxSafeInteger is 2^53. At or above it, IEEE-754 doubles can no longer hold
 // every integer, and JSON numbers decode to doubles. Such a value would round,
 // letting two distinct inputs collide on one query_hash, so we reject it and
 // require callers to send large values as strings.
-var maxSafeInteger = new(big.Rat).SetInt(new(big.Int).Lsh(big.NewInt(1), 53))
+func maxSafeInteger() *big.Rat {
+	return new(big.Rat).SetInt(new(big.Int).Lsh(big.NewInt(1), maxSafeIntegerBits))
+}
 
 // QueryHash returns keccak256 over the JCS canonicalization of
 // {"query": query, "variables": variables}, plus the canonical bytes it hashed
@@ -105,7 +109,7 @@ func checkBounds(v any) error {
 		if !ok {
 			return fmt.Errorf("invalid number %q", t.String())
 		}
-		if new(big.Rat).Abs(r).Cmp(maxSafeInteger) >= 0 {
+		if new(big.Rat).Abs(r).Cmp(maxSafeInteger()) >= 0 {
 			return fmt.Errorf("number %s has magnitude >= 2^53; send large values as strings", t.String())
 		}
 	}
