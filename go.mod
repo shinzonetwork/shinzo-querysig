@@ -5,7 +5,7 @@ go 1.26
 require (
 	github.com/ethereum/go-ethereum v1.17.4
 	github.com/gowebpki/jcs v1.0.1
-	golang.org/x/crypto v0.49.0
+	golang.org/x/crypto v0.53.0
 )
 
 require (
@@ -18,5 +18,5 @@ require (
 	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/supranational/blst v0.3.16 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
 )
