@@ -22,12 +22,12 @@ func TestCheckFreshness(t *testing.T) {
 		maxAge  time.Duration
 		wantErr bool
 	}{
-		{"within window", uint64(now.Add(-time.Minute).Unix()), maxAge, false},
-		{"exactly now", uint64(now.Unix()), maxAge, false},
-		{"slightly future within skew", uint64(now.Add(time.Minute).Unix()), maxAge, false},
-		{"too old", uint64(now.Add(-time.Hour).Unix()), maxAge, true},
-		{"too far future", uint64(now.Add(time.Hour).Unix()), maxAge, true},
-		{"disabled lets a stale request through", uint64(now.Add(-time.Hour).Unix()), 0, false},
+		{"within window", uint64(now.Add(-time.Minute).Unix()), maxAge, false},                  //nolint:gosec // test time is always small and positive
+		{"exactly now", uint64(now.Unix()), maxAge, false},                                      //nolint:gosec // test time is always small and positive
+		{"slightly future within skew", uint64(now.Add(time.Minute).Unix()), maxAge, false},     //nolint:gosec // test time is always small and positive
+		{"too old", uint64(now.Add(-time.Hour).Unix()), maxAge, true},                           //nolint:gosec // test time is always small and positive
+		{"too far future", uint64(now.Add(time.Hour).Unix()), maxAge, true},                     //nolint:gosec // test time is always small and positive
+		{"disabled lets a stale request through", uint64(now.Add(-time.Hour).Unix()), 0, false}, //nolint:gosec // test time is always small and positive
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

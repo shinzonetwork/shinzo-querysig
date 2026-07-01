@@ -13,7 +13,6 @@ package canonical
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -21,11 +20,15 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+const maxSafeIntegerBits = 53
+
 // maxSafeInteger is 2^53. At or above it, IEEE-754 doubles can no longer hold
 // every integer, and JSON numbers decode to doubles. Such a value would round,
 // letting two distinct inputs collide on one query_hash, so we reject it and
 // require callers to send large values as strings.
-var maxSafeInteger = new(big.Rat).SetInt(new(big.Int).Lsh(big.NewInt(1), 53))
+func maxSafeInteger() *big.Rat {
+	return new(big.Rat).SetInt(new(big.Int).Lsh(big.NewInt(1), maxSafeIntegerBits))
+}
 
 // QueryHash returns keccak256 over the JCS canonicalization of
 // {"query": query, "variables": variables}, plus the canonical bytes it hashed
@@ -76,10 +79,10 @@ func checkVariables(vars []byte) error {
 		return fmt.Errorf("decode variables: %w", err)
 	}
 	if dec.More() {
-		return errors.New("variables must be a single JSON object")
+		return ErrVariablesNotSingleValue
 	}
 	if _, ok := v.(map[string]any); !ok {
-		return errors.New("variables must be a JSON object")
+		return ErrVariablesNotObject
 	}
 	return checkBounds(v)
 }
@@ -103,10 +106,10 @@ func checkBounds(v any) error {
 	case json.Number:
 		r, ok := new(big.Rat).SetString(t.String())
 		if !ok {
-			return fmt.Errorf("invalid number %q", t.String())
+			return fmt.Errorf("%w: %q", ErrInvalidNumber, t.String())
 		}
-		if new(big.Rat).Abs(r).Cmp(maxSafeInteger) >= 0 {
-			return fmt.Errorf("number %s has magnitude >= 2^53; send large values as strings", t.String())
+		if new(big.Rat).Abs(r).Cmp(maxSafeInteger()) >= 0 {
+			return fmt.Errorf("%w: %s", ErrNumberTooLarge, t.String())
 		}
 	}
 	return nil

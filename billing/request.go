@@ -26,37 +26,54 @@ import (
 const (
 	domainName    = "ShinzoQueryBilling"
 	domainVersion = "1"
+
+	hashSize  = 32
+	nonceSize = 32
+	sigSize   = 65
+
+	// sigVOffset converts crypto.Sign's raw recovery id (0/1) to the
+	// wallet-style v (27/28) used by viem and ecrecover.
+	sigVOffset = 27
+
+	// queryRequestType is the EIP-712 type name for QueryRequest. It must
+	// match the same literal the viem client signs against. Shared field and
+	// solidity-type names (eip712DomainType, fieldName, fieldQueryHash, etc.)
+	// are defined in response.go.
+	queryRequestType = "QueryRequest"
+
+	fieldNonce     = "nonce"
+	fieldTimestamp = "timestamp"
 )
 
 // QueryRequest is the EIP-712 message a client signs to authorize one billed
 // query. Timestamp is unix seconds; Nonce is 32 random bytes that make each
 // request unique so a signature cannot be replayed.
 type QueryRequest struct {
-	QueryHash [32]byte
-	Nonce     [32]byte
+	QueryHash [hashSize]byte
+	Nonce     [nonceSize]byte
 	Timestamp uint64
 }
 
 // NewNonce returns 32 cryptographically random bytes for QueryRequest.Nonce.
-func NewNonce() ([32]byte, error) {
-	var n [32]byte
+func NewNonce() ([nonceSize]byte, error) {
+	var n [nonceSize]byte
 	if _, err := rand.Read(n[:]); err != nil {
-		return [32]byte{}, fmt.Errorf("read nonce: %w", err)
+		return [nonceSize]byte{}, fmt.Errorf("read nonce: %w", err)
 	}
 	return n, nil
 }
 
 // NonceFromHex decodes a 0x-prefixed hex nonce and requires exactly 32 bytes, so
 // a malformed wire value cannot be padded into a different request silently.
-func NonceFromHex(s string) ([32]byte, error) {
+func NonceFromHex(s string) ([nonceSize]byte, error) {
 	b, err := hexutil.Decode(s)
 	if err != nil {
-		return [32]byte{}, fmt.Errorf("decode nonce: %w", err)
+		return [nonceSize]byte{}, fmt.Errorf("decode nonce: %w", err)
 	}
-	if len(b) != 32 {
-		return [32]byte{}, fmt.Errorf("nonce must be 32 bytes, got %d", len(b))
+	if len(b) != nonceSize {
+		return [nonceSize]byte{}, fmt.Errorf("%w: got %d", ErrInvalidNonceLength, len(b))
 	}
-	var n [32]byte
+	var n [nonceSize]byte
 	copy(n[:], b)
 	return n, nil
 }
@@ -72,24 +89,24 @@ func SignQueryRequest(chainID uint64, priv *ecdsa.PrivateKey, req QueryRequest) 
 	if err != nil {
 		return nil, fmt.Errorf("sign query request: %w", err)
 	}
-	sig[64] += 27
+	sig[sigSize-1] += sigVOffset
 	return sig, nil
 }
 
 // RecoverQueryRequest returns the address that signed req for chainID. It
 // accepts a recovery id of 27/28 or 0/1.
 func RecoverQueryRequest(chainID uint64, req QueryRequest, sig []byte) (common.Address, error) {
-	if len(sig) != 65 {
-		return common.Address{}, fmt.Errorf("signature must be 65 bytes, got %d", len(sig))
+	if len(sig) != sigSize {
+		return common.Address{}, fmt.Errorf("%w: got %d", ErrInvalidSignatureLength, len(sig))
 	}
 	digest, err := requestDigest(chainID, req)
 	if err != nil {
 		return common.Address{}, err
 	}
-	normalized := make([]byte, 65)
+	normalized := make([]byte, sigSize)
 	copy(normalized, sig)
-	if normalized[64] >= 27 {
-		normalized[64] -= 27
+	if normalized[sigSize-1] >= sigVOffset {
+		normalized[sigSize-1] -= sigVOffset
 	}
 	pub, err := crypto.SigToPub(digest, normalized)
 	if err != nil {
@@ -102,27 +119,27 @@ func RecoverQueryRequest(chainID uint64, req QueryRequest, sig []byte) (common.A
 func requestDigest(chainID uint64, req QueryRequest) ([]byte, error) {
 	td := apitypes.TypedData{
 		Types: apitypes.Types{
-			"EIP712Domain": {
-				{Name: "name", Type: "string"},
-				{Name: "version", Type: "string"},
-				{Name: "chainId", Type: "uint256"},
+			eip712DomainType: {
+				{Name: fieldName, Type: solidityString},
+				{Name: fieldVersion, Type: solidityString},
+				{Name: fieldChainID, Type: solidityUint256},
 			},
-			"QueryRequest": {
-				{Name: "queryHash", Type: "bytes32"},
-				{Name: "nonce", Type: "bytes32"},
-				{Name: "timestamp", Type: "uint256"},
+			queryRequestType: {
+				{Name: fieldQueryHash, Type: solidityBytes32},
+				{Name: fieldNonce, Type: solidityBytes32},
+				{Name: fieldTimestamp, Type: solidityUint256},
 			},
 		},
-		PrimaryType: "QueryRequest",
+		PrimaryType: queryRequestType,
 		Domain: apitypes.TypedDataDomain{
 			Name:    domainName,
 			Version: domainVersion,
 			ChainId: (*math.HexOrDecimal256)(new(big.Int).SetUint64(chainID)),
 		},
 		Message: apitypes.TypedDataMessage{
-			"queryHash": hexutil.Encode(req.QueryHash[:]),
-			"nonce":     hexutil.Encode(req.Nonce[:]),
-			"timestamp": (*math.HexOrDecimal256)(new(big.Int).SetUint64(req.Timestamp)),
+			fieldQueryHash: hexutil.Encode(req.QueryHash[:]),
+			fieldNonce:     hexutil.Encode(req.Nonce[:]),
+			fieldTimestamp: (*math.HexOrDecimal256)(new(big.Int).SetUint64(req.Timestamp)),
 		},
 	}
 	digest, _, err := apitypes.TypedDataAndHash(td)

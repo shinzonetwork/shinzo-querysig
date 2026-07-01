@@ -3,6 +3,7 @@ package billing
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -15,7 +16,7 @@ import (
 // signature, so a verifier can recover the signer. It errors if any field is
 // malformed (bad hex, wrong length).
 func (e Extensions) Request() (QueryRequest, []byte, error) {
-	queryHash, err := decodeBytes32(e.QueryHash)
+	queryHash, err := decodeHashBytes(e.QueryHash)
 	if err != nil {
 		return QueryRequest{}, nil, fmt.Errorf("query_hash: %w", err)
 	}
@@ -47,8 +48,8 @@ func VerifyRequest(chainID uint64, query string, variables json.RawMessage, ext 
 	}
 	if req.QueryHash != recomputed {
 		return common.Address{}, fmt.Errorf(
-			"query_hash mismatch: signed %s, computed %s",
-			hexutil.Encode(req.QueryHash[:]), hexutil.Encode(recomputed[:]),
+			"%w: signed %s, computed %s",
+			ErrQueryHashMismatch, hexutil.Encode(req.QueryHash[:]), hexutil.Encode(recomputed[:]),
 		)
 	}
 
@@ -65,23 +66,26 @@ func CheckFreshness(timestamp uint64, now time.Time, maxAge time.Duration) error
 	if maxAge <= 0 {
 		return nil
 	}
+	if timestamp > math.MaxInt64 {
+		return fmt.Errorf("%w: %d", ErrTimestampOutOfRange, timestamp)
+	}
 	signedAt := time.Unix(int64(timestamp), 0)
 	if now.Sub(signedAt).Abs() > maxAge {
-		return fmt.Errorf("request timestamp %s is outside the %s freshness window (now %s)", signedAt.UTC(), maxAge, now.UTC())
+		return fmt.Errorf("%w: signed at %s, max age %s, now %s", ErrStaleTimestamp, signedAt.UTC(), maxAge, now.UTC())
 	}
 	return nil
 }
 
-// decodeBytes32 decodes a 0x-prefixed hex value and requires exactly 32 bytes.
-func decodeBytes32(s string) ([32]byte, error) {
+// decodeHashBytes decodes a 0x-prefixed hex value and requires exactly 32 bytes.
+func decodeHashBytes(s string) ([hashSize]byte, error) {
 	b, err := hexutil.Decode(s)
 	if err != nil {
-		return [32]byte{}, err
+		return [hashSize]byte{}, err
 	}
-	if len(b) != 32 {
-		return [32]byte{}, fmt.Errorf("expected 32 bytes, got %d", len(b))
+	if len(b) != hashSize {
+		return [hashSize]byte{}, fmt.Errorf("%w: got %d", ErrInvalidHashLength, len(b))
 	}
-	var out [32]byte
+	var out [hashSize]byte
 	copy(out[:], b)
 	return out, nil
 }
