@@ -3,6 +3,7 @@ package billing
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -64,6 +65,9 @@ func VerifyRequest(chainID uint64, query string, variables json.RawMessage, ext 
 func CheckFreshness(timestamp uint64, now time.Time, maxAge time.Duration) error {
 	if maxAge <= 0 {
 		return nil
+	}
+	if timestamp > math.MaxInt64 {
+		return fmt.Errorf("%w: %d", ErrTimestampOutOfRange, timestamp)
 	}
 	signedAt := time.Unix(int64(timestamp), 0)
 	if now.Sub(signedAt).Abs() > maxAge {

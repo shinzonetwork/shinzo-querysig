@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -15,7 +14,7 @@ import (
 // re-checked with verify.mjs to confirm the JS client still agrees.
 var update = flag.Bool("update", false, "regenerate testdata/golden/canonical.json from QueryHash")
 
-var goldenPath = filepath.Join("testdata", "golden", "canonical.json")
+const goldenPath = "testdata/golden/canonical.json"
 
 type vector struct {
 	Name      string          `json:"name"`
@@ -177,7 +176,7 @@ func writeGolden(t *testing.T, g *golden) {
 	if err != nil {
 		t.Fatalf("marshal golden: %v", err)
 	}
-	if err := os.WriteFile(goldenPath, append(b, '\n'), 0o644); err != nil {
+	if err := os.WriteFile(goldenPath, append(b, '\n'), 0o600); err != nil {
 		t.Fatalf("write golden: %v", err)
 	}
 }
