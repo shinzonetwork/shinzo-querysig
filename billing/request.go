@@ -71,7 +71,7 @@ func NonceFromHex(s string) ([nonceSize]byte, error) {
 		return [nonceSize]byte{}, fmt.Errorf("decode nonce: %w", err)
 	}
 	if len(b) != nonceSize {
-		return [nonceSize]byte{}, fmt.Errorf("nonce must be 32 bytes, got %d", len(b))
+		return [nonceSize]byte{}, fmt.Errorf("%w: got %d", ErrInvalidNonceLength, len(b))
 	}
 	var n [nonceSize]byte
 	copy(n[:], b)
@@ -97,7 +97,7 @@ func SignQueryRequest(chainID uint64, priv *ecdsa.PrivateKey, req QueryRequest) 
 // accepts a recovery id of 27/28 or 0/1.
 func RecoverQueryRequest(chainID uint64, req QueryRequest, sig []byte) (common.Address, error) {
 	if len(sig) != sigSize {
-		return common.Address{}, fmt.Errorf("signature must be 65 bytes, got %d", len(sig))
+		return common.Address{}, fmt.Errorf("%w: got %d", ErrInvalidSignatureLength, len(sig))
 	}
 	digest, err := requestDigest(chainID, req)
 	if err != nil {

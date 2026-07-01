@@ -13,7 +13,6 @@ package canonical
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -80,10 +79,10 @@ func checkVariables(vars []byte) error {
 		return fmt.Errorf("decode variables: %w", err)
 	}
 	if dec.More() {
-		return errors.New("variables must be a single JSON object")
+		return ErrVariablesNotSingleValue
 	}
 	if _, ok := v.(map[string]any); !ok {
-		return errors.New("variables must be a JSON object")
+		return ErrVariablesNotObject
 	}
 	return checkBounds(v)
 }
@@ -107,10 +106,10 @@ func checkBounds(v any) error {
 	case json.Number:
 		r, ok := new(big.Rat).SetString(t.String())
 		if !ok {
-			return fmt.Errorf("invalid number %q", t.String())
+			return fmt.Errorf("%w: %q", ErrInvalidNumber, t.String())
 		}
 		if new(big.Rat).Abs(r).Cmp(maxSafeInteger()) >= 0 {
-			return fmt.Errorf("number %s has magnitude >= 2^53; send large values as strings", t.String())
+			return fmt.Errorf("%w: %s", ErrNumberTooLarge, t.String())
 		}
 	}
 	return nil

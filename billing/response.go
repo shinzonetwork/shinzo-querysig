@@ -70,7 +70,7 @@ func SignQueryResponse(chainID uint64, priv *ecdsa.PrivateKey, resp QueryRespons
 // accepts a recovery id of 27/28 or 0/1.
 func RecoverQueryResponse(chainID uint64, resp QueryResponse, sig []byte) (common.Address, error) {
 	if len(sig) != sigSize {
-		return common.Address{}, fmt.Errorf("signature must be 65 bytes, got %d", len(sig))
+		return common.Address{}, fmt.Errorf("%w: got %d", ErrInvalidSignatureLength, len(sig))
 	}
 	digest, err := responseDigest(chainID, resp)
 	if err != nil {

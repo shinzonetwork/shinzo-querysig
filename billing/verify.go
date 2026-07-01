@@ -47,8 +47,8 @@ func VerifyRequest(chainID uint64, query string, variables json.RawMessage, ext 
 	}
 	if req.QueryHash != recomputed {
 		return common.Address{}, fmt.Errorf(
-			"query_hash mismatch: signed %s, computed %s",
-			hexutil.Encode(req.QueryHash[:]), hexutil.Encode(recomputed[:]),
+			"%w: signed %s, computed %s",
+			ErrQueryHashMismatch, hexutil.Encode(req.QueryHash[:]), hexutil.Encode(recomputed[:]),
 		)
 	}
 
@@ -67,7 +67,7 @@ func CheckFreshness(timestamp uint64, now time.Time, maxAge time.Duration) error
 	}
 	signedAt := time.Unix(int64(timestamp), 0)
 	if now.Sub(signedAt).Abs() > maxAge {
-		return fmt.Errorf("request timestamp %s is outside the %s freshness window (now %s)", signedAt.UTC(), maxAge, now.UTC())
+		return fmt.Errorf("%w: signed at %s, max age %s, now %s", ErrStaleTimestamp, signedAt.UTC(), maxAge, now.UTC())
 	}
 	return nil
 }
@@ -79,7 +79,7 @@ func decodeHashBytes(s string) ([hashSize]byte, error) {
 		return [hashSize]byte{}, err
 	}
 	if len(b) != hashSize {
-		return [hashSize]byte{}, fmt.Errorf("expected 32 bytes, got %d", len(b))
+		return [hashSize]byte{}, fmt.Errorf("%w: got %d", ErrInvalidHashLength, len(b))
 	}
 	var out [hashSize]byte
 	copy(out[:], b)
