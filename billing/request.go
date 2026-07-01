@@ -34,6 +34,15 @@ const (
 	// sigVOffset converts crypto.Sign's raw recovery id (0/1) to the
 	// wallet-style v (27/28) used by viem and ecrecover.
 	sigVOffset = 27
+
+	// queryRequestType is the EIP-712 type name for QueryRequest. It must
+	// match the same literal the viem client signs against. Shared field and
+	// solidity-type names (eip712DomainType, fieldName, fieldQueryHash, etc.)
+	// are defined in response.go.
+	queryRequestType = "QueryRequest"
+
+	fieldNonce     = "nonce"
+	fieldTimestamp = "timestamp"
 )
 
 // QueryRequest is the EIP-712 message a client signs to authorize one billed
@@ -110,27 +119,27 @@ func RecoverQueryRequest(chainID uint64, req QueryRequest, sig []byte) (common.A
 func requestDigest(chainID uint64, req QueryRequest) ([]byte, error) {
 	td := apitypes.TypedData{
 		Types: apitypes.Types{
-			"EIP712Domain": {
-				{Name: "name", Type: "string"},
-				{Name: "version", Type: "string"},
-				{Name: "chainId", Type: "uint256"},
+			eip712DomainType: {
+				{Name: fieldName, Type: solidityString},
+				{Name: fieldVersion, Type: solidityString},
+				{Name: fieldChainID, Type: solidityUint256},
 			},
-			"QueryRequest": {
-				{Name: "queryHash", Type: "bytes32"},
-				{Name: "nonce", Type: "bytes32"},
-				{Name: "timestamp", Type: "uint256"},
+			queryRequestType: {
+				{Name: fieldQueryHash, Type: solidityBytes32},
+				{Name: fieldNonce, Type: solidityBytes32},
+				{Name: fieldTimestamp, Type: solidityUint256},
 			},
 		},
-		PrimaryType: "QueryRequest",
+		PrimaryType: queryRequestType,
 		Domain: apitypes.TypedDataDomain{
 			Name:    domainName,
 			Version: domainVersion,
 			ChainId: (*math.HexOrDecimal256)(new(big.Int).SetUint64(chainID)),
 		},
 		Message: apitypes.TypedDataMessage{
-			"queryHash": hexutil.Encode(req.QueryHash[:]),
-			"nonce":     hexutil.Encode(req.Nonce[:]),
-			"timestamp": (*math.HexOrDecimal256)(new(big.Int).SetUint64(req.Timestamp)),
+			fieldQueryHash: hexutil.Encode(req.QueryHash[:]),
+			fieldNonce:     hexutil.Encode(req.Nonce[:]),
+			fieldTimestamp: (*math.HexOrDecimal256)(new(big.Int).SetUint64(req.Timestamp)),
 		},
 	}
 	digest, _, err := apitypes.TypedDataAndHash(td)
