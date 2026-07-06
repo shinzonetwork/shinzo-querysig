@@ -13,6 +13,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+// testPool is a fixed non-zero pool address for the round-trip and envelope
+// tests; its value is arbitrary as long as signing and recovery use the same one.
+var testPool = common.HexToAddress("0x2222222222222222222222222222222222222222")
+
 type eip712Golden struct {
 	PrivateKey string `json:"privateKey"`
 	Address    string `json:"address"`
@@ -25,6 +29,7 @@ type eip712Golden struct {
 		QueryHash string `json:"queryHash"`
 		Nonce     string `json:"nonce"`
 		Timestamp uint64 `json:"timestamp"`
+		Pool      string `json:"pool"`
 	} `json:"request"`
 	Signature string `json:"signature"`
 }
@@ -43,6 +48,7 @@ func loadEIP712Golden(t *testing.T) (eip712Golden, QueryRequest, []byte) {
 		QueryHash: hexTo32(t, g.Request.QueryHash),
 		Nonce:     hexTo32(t, g.Request.Nonce),
 		Timestamp: g.Request.Timestamp,
+		Pool:      common.HexToAddress(g.Request.Pool),
 	}
 	sig, err := hexutil.Decode(g.Signature)
 	if err != nil {
@@ -104,7 +110,7 @@ func TestSignRecoverRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := QueryRequest{QueryHash: [32]byte{0x01}, Nonce: nonce, Timestamp: 1735689600}
+	req := QueryRequest{QueryHash: [32]byte{0x01}, Nonce: nonce, Timestamp: 1735689600, Pool: testPool}
 
 	sig, err := SignQueryRequest(91273002, priv, req)
 	if err != nil {
@@ -133,6 +139,7 @@ func TestRecoverBindsEveryField(t *testing.T) {
 		{"queryHash", func(r *QueryRequest, _ *uint64) { r.QueryHash[0] ^= 0xff }},
 		{"nonce", func(r *QueryRequest, _ *uint64) { r.Nonce[0] ^= 0xff }},
 		{"timestamp", func(r *QueryRequest, _ *uint64) { r.Timestamp++ }},
+		{"pool", func(r *QueryRequest, _ *uint64) { r.Pool[0] ^= 0xff }},
 		{"chainID", func(_ *QueryRequest, c *uint64) { *c++ }},
 	}
 	for _, tc := range cases {

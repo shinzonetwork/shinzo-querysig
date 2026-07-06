@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 
@@ -21,7 +22,7 @@ func TestSignRequestRoundTrip(t *testing.T) {
 	signer := crypto.PubkeyToAddress(priv.PublicKey)
 	const chainID = 91273002
 
-	ext, err := SignRequest(chainID, priv, "query { Foo { id } }", json.RawMessage(`{"limit":10}`), 3, 1735689600)
+	ext, err := SignRequest(chainID, priv, "query { Foo { id } }", json.RawMessage(`{"limit":10}`), testPool, 3, 1735689600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,6 +31,7 @@ func TestSignRequestRoundTrip(t *testing.T) {
 		QueryHash: hexTo32(t, ext.QueryHash),
 		Nonce:     hexTo32(t, ext.Nonce),
 		Timestamp: ext.RequestTimestamp,
+		Pool:      common.HexToAddress(ext.PoolAddress),
 	}
 	sig, err := hexutil.Decode(ext.RequestSignature)
 	if err != nil {
@@ -54,7 +56,7 @@ func TestSignRequestQueryHashMatchesCanonical(t *testing.T) {
 	const query = "query { Foo { id } }"
 	vars := json.RawMessage(`{"a":1,"b":2}`)
 
-	ext, err := SignRequest(91273002, priv, query, vars, 1, 1735689600)
+	ext, err := SignRequest(91273002, priv, query, vars, testPool, 1, 1735689600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +74,7 @@ func TestSignRequestFieldsWellFormed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ext, err := SignRequest(91273002, priv, "q", nil, 5, 1735689600)
+	ext, err := SignRequest(91273002, priv, "q", nil, testPool, 5, 1735689600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,6 +91,9 @@ func TestSignRequestFieldsWellFormed(t *testing.T) {
 	if ext.RequestTimestamp != 1735689600 {
 		t.Errorf("timestamp not carried: %d", ext.RequestTimestamp)
 	}
+	if ext.PoolAddress != testPool.Hex() {
+		t.Errorf("pool_address not carried: got %q, want %q", ext.PoolAddress, testPool.Hex())
+	}
 	if ext.Fanout != 5 {
 		t.Errorf("fanout not carried: %d", ext.Fanout)
 	}
@@ -101,7 +106,7 @@ func TestSignRequestPropagatesVariablesError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := SignRequest(91273002, priv, "q", json.RawMessage(`{"n":9007199254740992}`), 1, 1735689600); err == nil {
+	if _, err := SignRequest(91273002, priv, "q", json.RawMessage(`{"n":9007199254740992}`), testPool, 1, 1735689600); err == nil {
 		t.Fatal("expected an error for an out-of-range variable, got nil")
 	}
 }
@@ -111,11 +116,11 @@ func TestSignRequestNonceUnique(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := SignRequest(91273002, priv, "q", nil, 1, 1735689600)
+	a, err := SignRequest(91273002, priv, "q", nil, testPool, 1, 1735689600)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := SignRequest(91273002, priv, "q", nil, 1, 1735689600)
+	b, err := SignRequest(91273002, priv, "q", nil, testPool, 1, 1735689600)
 	if err != nil {
 		t.Fatal(err)
 	}

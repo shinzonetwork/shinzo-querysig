@@ -46,12 +46,14 @@ const (
 )
 
 // QueryRequest is the EIP-712 message a client signs to authorize one billed
-// query. Timestamp is unix seconds; Nonce is 32 random bytes that make each
-// request unique so a signature cannot be replayed.
+// query. Pool is the pool the query bills to, so the payer authorizes the pool
+// it is charged against. Timestamp is unix seconds; Nonce is 32 random bytes
+// that make each request unique so a signature cannot be replayed.
 type QueryRequest struct {
 	QueryHash [hashSize]byte
 	Nonce     [nonceSize]byte
 	Timestamp uint64
+	Pool      common.Address
 }
 
 // NewNonce returns 32 cryptographically random bytes for QueryRequest.Nonce.
@@ -128,6 +130,7 @@ func requestDigest(chainID uint64, req QueryRequest) ([]byte, error) {
 				{Name: fieldQueryHash, Type: solidityBytes32},
 				{Name: fieldNonce, Type: solidityBytes32},
 				{Name: fieldTimestamp, Type: solidityUint256},
+				{Name: fieldPool, Type: solidityAddress},
 			},
 		},
 		PrimaryType: queryRequestType,
@@ -140,6 +143,7 @@ func requestDigest(chainID uint64, req QueryRequest) ([]byte, error) {
 			fieldQueryHash: hexutil.Encode(req.QueryHash[:]),
 			fieldNonce:     hexutil.Encode(req.Nonce[:]),
 			fieldTimestamp: (*math.HexOrDecimal256)(new(big.Int).SetUint64(req.Timestamp)),
+			fieldPool:      req.Pool.Hex(),
 		},
 	}
 	digest, _, err := apitypes.TypedDataAndHash(td)

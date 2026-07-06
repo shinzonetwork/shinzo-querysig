@@ -11,4 +11,5 @@ var (
 	ErrQueryHashMismatch      = errors.New("query_hash mismatch")
 	ErrStaleTimestamp         = errors.New("request timestamp outside freshness window")
 	ErrTimestampOutOfRange    = errors.New("request timestamp exceeds int64 range")
+	ErrInvalidPoolAddress     = errors.New("pool_address must be a hex address")
 )
