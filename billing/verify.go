@@ -24,11 +24,19 @@ func (e Extensions) Request() (QueryRequest, []byte, error) {
 	if err != nil {
 		return QueryRequest{}, nil, fmt.Errorf("nonce: %w", err)
 	}
+	if !common.IsHexAddress(e.PoolAddress) {
+		return QueryRequest{}, nil, fmt.Errorf("pool_address: %w", ErrInvalidPoolAddress)
+	}
 	sig, err := hexutil.Decode(e.RequestSignature)
 	if err != nil {
 		return QueryRequest{}, nil, fmt.Errorf("request_signature: %w", err)
 	}
-	return QueryRequest{QueryHash: queryHash, Nonce: nonce, Timestamp: e.RequestTimestamp}, sig, nil
+	return QueryRequest{
+		QueryHash: queryHash,
+		Nonce:     nonce,
+		Timestamp: e.RequestTimestamp,
+		Pool:      common.HexToAddress(e.PoolAddress),
+	}, sig, nil
 }
 
 // VerifyRequest recomputes the query_hash from query and variables, confirms it
@@ -58,8 +66,8 @@ func VerifyRequest(chainID uint64, query string, variables json.RawMessage, ext 
 
 // CheckFreshness rejects a request whose signed timestamp is more than maxAge
 // from now in either direction, bounding how long a captured signature can be
-// replayed: the QueryRequest binds no host or pool and nothing tracks the nonce,
-// so without this the signature never expires. The timestamp is signed, so it
+// replayed: the QueryRequest binds no host and nothing tracks the nonce, so
+// without this the signature never expires. The timestamp is signed, so it
 // can't be altered without breaking recovery. A non-positive maxAge disables the
 // check; now is passed in so the caller owns the clock.
 func CheckFreshness(timestamp uint64, now time.Time, maxAge time.Duration) error {

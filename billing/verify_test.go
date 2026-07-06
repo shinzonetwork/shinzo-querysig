@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -54,7 +55,7 @@ func TestVerifyRequestRecoversPayer(t *testing.T) {
 	query := "query { Log { id } }"
 	vars := json.RawMessage(`{"limit":10}`)
 
-	ext, err := SignRequest(chainID, priv, query, vars, 3, 1735689600)
+	ext, err := SignRequest(chainID, priv, query, vars, testPool, 3, 1735689600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +76,7 @@ func TestVerifyRequestRejectsTamperedQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ext, err := SignRequest(91273002, priv, "query { A }", nil, 1, 1735689600)
+	ext, err := SignRequest(91273002, priv, "query { A }", nil, testPool, 1, 1735689600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +92,7 @@ func TestVerifyRequestRejectsTamperedVariables(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ext, err := SignRequest(91273002, priv, "query { A }", json.RawMessage(`{"limit":10}`), 1, 1735689600)
+	ext, err := SignRequest(91273002, priv, "query { A }", json.RawMessage(`{"limit":10}`), testPool, 1, 1735689600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +110,7 @@ func TestVerifyRequestWrongChainDoesNotRecoverSigner(t *testing.T) {
 		t.Fatal(err)
 	}
 	signer := crypto.PubkeyToAddress(priv.PublicKey)
-	ext, err := SignRequest(91273002, priv, "query { A }", nil, 1, 1735689600)
+	ext, err := SignRequest(91273002, priv, "query { A }", nil, testPool, 1, 1735689600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,16 +124,45 @@ func TestVerifyRequestWrongChainDoesNotRecoverSigner(t *testing.T) {
 	}
 }
 
+// TestVerifyRequestBindsPool checks the pool_address is part of the signed
+// request: verifying an envelope whose pool_address was swapped after signing
+// recovers a different address, so a host cannot be redirected to bill a pool
+// the payer never authorized.
+func TestVerifyRequestBindsPool(t *testing.T) {
+	priv, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer := crypto.PubkeyToAddress(priv.PublicKey)
+	query := "query { A }"
+
+	ext, err := SignRequest(91273002, priv, query, nil, testPool, 1, 1735689600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ext.PoolAddress = common.HexToAddress("0x3333333333333333333333333333333333333333").Hex()
+
+	payer, err := VerifyRequest(91273002, query, nil, ext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payer == signer {
+		t.Error("swapping pool_address still recovered the signer; pool is not bound into the request")
+	}
+}
+
 func TestExtensionsRequestRejectsMalformed(t *testing.T) {
 	hash32 := "0x" + strings.Repeat("00", 32)
 	sig65 := "0x" + strings.Repeat("11", 65)
+	pool := testPool.Hex()
 	cases := []struct {
 		name string
 		ext  Extensions
 	}{
-		{"short query_hash", Extensions{RequestSignature: sig65, Nonce: hash32, QueryHash: "0x00"}},
-		{"short nonce", Extensions{RequestSignature: sig65, Nonce: "0x00", QueryHash: hash32}},
-		{"bad signature hex", Extensions{RequestSignature: "0xzz", Nonce: hash32, QueryHash: hash32}},
+		{"short query_hash", Extensions{RequestSignature: sig65, Nonce: hash32, QueryHash: "0x00", PoolAddress: pool}},
+		{"short nonce", Extensions{RequestSignature: sig65, Nonce: "0x00", QueryHash: hash32, PoolAddress: pool}},
+		{"bad signature hex", Extensions{RequestSignature: "0xzz", Nonce: hash32, QueryHash: hash32, PoolAddress: pool}},
+		{"bad pool_address", Extensions{RequestSignature: sig65, Nonce: hash32, QueryHash: hash32, PoolAddress: "not-an-address"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

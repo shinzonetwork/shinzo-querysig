@@ -25,6 +25,7 @@ const typedData = {
       { name: 'queryHash', type: 'bytes32' },
       { name: 'nonce', type: 'bytes32' },
       { name: 'timestamp', type: 'uint256' },
+      { name: 'pool', type: 'address' },
     ],
   },
   primaryType: 'QueryRequest',
@@ -32,6 +33,7 @@ const typedData = {
     queryHash: g.request.queryHash,
     nonce: g.request.nonce,
     timestamp: BigInt(g.request.timestamp),
+    pool: g.request.pool,
   },
 };
 
