@@ -4,10 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/shinzonetwork/shinzo-querysig/canonical"
 )
 
@@ -15,11 +11,11 @@ import (
 // signature recovers to the signer over exactly the query_hash, nonce, and
 // timestamp the envelope reports, which is what the host re-derives.
 func TestSignRequestRoundTrip(t *testing.T) {
-	priv, err := crypto.GenerateKey()
+	priv, err := GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer := crypto.PubkeyToAddress(priv.PublicKey)
+	signer := PubkeyToAddress(priv.PubKey())
 	const chainID = 91273002
 
 	ext, err := SignRequest(chainID, priv, "query { Foo { id } }", json.RawMessage(`{"limit":10}`), testPool, 3, 1735689600)
@@ -31,9 +27,9 @@ func TestSignRequestRoundTrip(t *testing.T) {
 		QueryHash: hexTo32(t, ext.QueryHash),
 		Nonce:     hexTo32(t, ext.Nonce),
 		Timestamp: ext.RequestTimestamp,
-		Pool:      common.HexToAddress(ext.PoolAddress),
+		Pool:      mustAddress(ext.PoolAddress),
 	}
-	sig, err := hexutil.Decode(ext.RequestSignature)
+	sig, err := decodeHex(ext.RequestSignature)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +45,7 @@ func TestSignRequestRoundTrip(t *testing.T) {
 // TestSignRequestQueryHashMatchesCanonical checks the envelope carries the same
 // hash the host will recompute from the query and variables.
 func TestSignRequestQueryHashMatchesCanonical(t *testing.T) {
-	priv, err := crypto.GenerateKey()
+	priv, err := GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,13 +60,13 @@ func TestSignRequestQueryHashMatchesCanonical(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ext.QueryHash != hexutil.Encode(want[:]) {
-		t.Errorf("query_hash %s, want %s", ext.QueryHash, hexutil.Encode(want[:]))
+	if ext.QueryHash != encodeHex(want[:]) {
+		t.Errorf("query_hash %s, want %s", ext.QueryHash, encodeHex(want[:]))
 	}
 }
 
 func TestSignRequestFieldsWellFormed(t *testing.T) {
-	priv, err := crypto.GenerateKey()
+	priv, err := GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,13 +75,13 @@ func TestSignRequestFieldsWellFormed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if sig, err := hexutil.Decode(ext.RequestSignature); err != nil || len(sig) != 65 {
+	if sig, err := decodeHex(ext.RequestSignature); err != nil || len(sig) != 65 {
 		t.Errorf("request_signature not 65-byte hex: err=%v len=%d", err, len(sig))
 	}
-	if nonce, err := hexutil.Decode(ext.Nonce); err != nil || len(nonce) != 32 {
+	if nonce, err := decodeHex(ext.Nonce); err != nil || len(nonce) != 32 {
 		t.Errorf("nonce not 32-byte hex: err=%v len=%d", err, len(nonce))
 	}
-	if qh, err := hexutil.Decode(ext.QueryHash); err != nil || len(qh) != 32 {
+	if qh, err := decodeHex(ext.QueryHash); err != nil || len(qh) != 32 {
 		t.Errorf("query_hash not 32-byte hex: err=%v len=%d", err, len(qh))
 	}
 	if ext.RequestTimestamp != 1735689600 {
@@ -102,7 +98,7 @@ func TestSignRequestFieldsWellFormed(t *testing.T) {
 // TestSignRequestPropagatesVariablesError checks a variable the canonical layer
 // rejects (>= 2^53) surfaces as an error rather than being signed.
 func TestSignRequestPropagatesVariablesError(t *testing.T) {
-	priv, err := crypto.GenerateKey()
+	priv, err := GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +108,7 @@ func TestSignRequestPropagatesVariablesError(t *testing.T) {
 }
 
 func TestSignRequestNonceUnique(t *testing.T) {
-	priv, err := crypto.GenerateKey()
+	priv, err := GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}

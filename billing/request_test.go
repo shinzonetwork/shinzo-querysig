@@ -7,15 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // testPool is a fixed non-zero pool address for the round-trip and envelope
 // tests; its value is arbitrary as long as signing and recovery use the same one.
-var testPool = common.HexToAddress("0x2222222222222222222222222222222222222222")
+var testPool = mustAddress("0x2222222222222222222222222222222222222222")
 
 type eip712Golden struct {
 	PrivateKey string `json:"privateKey"`
@@ -48,9 +44,9 @@ func loadEIP712Golden(t *testing.T) (eip712Golden, QueryRequest, []byte) {
 		QueryHash: hexTo32(t, g.Request.QueryHash),
 		Nonce:     hexTo32(t, g.Request.Nonce),
 		Timestamp: g.Request.Timestamp,
-		Pool:      common.HexToAddress(g.Request.Pool),
+		Pool:      mustAddress(g.Request.Pool),
 	}
-	sig, err := hexutil.Decode(g.Signature)
+	sig, err := decodeHex(g.Signature)
 	if err != nil {
 		t.Fatalf("decode golden signature: %v", err)
 	}
@@ -59,7 +55,7 @@ func loadEIP712Golden(t *testing.T) (eip712Golden, QueryRequest, []byte) {
 
 func hexTo32(t *testing.T, s string) [32]byte {
 	t.Helper()
-	b, err := hexutil.Decode(s)
+	b, err := decodeHex(s)
 	if err != nil || len(b) != 32 {
 		t.Fatalf("bad 32-byte hex %q: %v", s, err)
 	}
@@ -87,35 +83,29 @@ func TestRecoverViemGolden(t *testing.T) {
 // divergence means the digests differ (a domain or encoding mismatch).
 func TestSignMatchesViem(t *testing.T) {
 	g, req, want := loadEIP712Golden(t)
-	priv, err := crypto.HexToECDSA(strings.TrimPrefix(g.PrivateKey, "0x"))
+	priv, err := KeyFromHex(g.PrivateKey)
 	if err != nil {
 		t.Fatalf("load key: %v", err)
 	}
-	got, err := SignQueryRequest(g.Domain.ChainID, priv, req)
-	if err != nil {
-		t.Fatalf("sign: %v", err)
-	}
+	got := SignQueryRequest(g.Domain.ChainID, priv, req)
 	if !bytes.Equal(got, want) {
-		t.Errorf("Go signature differs from viem\n got:  %s\nwant: %s", hexutil.Encode(got), hexutil.Encode(want))
+		t.Errorf("Go signature differs from viem\n got:  %s\nwant: %s", encodeHex(got), encodeHex(want))
 	}
 }
 
 func TestSignRecoverRoundTrip(t *testing.T) {
-	priv, err := crypto.GenerateKey()
+	priv, err := GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := crypto.PubkeyToAddress(priv.PublicKey)
+	want := PubkeyToAddress(priv.PubKey())
 	nonce, err := NewNonce()
 	if err != nil {
 		t.Fatal(err)
 	}
 	req := QueryRequest{QueryHash: [32]byte{0x01}, Nonce: nonce, Timestamp: 1735689600, Pool: testPool}
 
-	sig, err := SignQueryRequest(91273002, priv, req)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sig := SignQueryRequest(91273002, priv, req)
 	got, err := RecoverQueryRequest(91273002, req, sig)
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +120,7 @@ func TestSignRecoverRoundTrip(t *testing.T) {
 // the digest and cannot be swapped after signing.
 func TestRecoverBindsEveryField(t *testing.T) {
 	g, req, sig := loadEIP712Golden(t)
-	signer := common.HexToAddress(g.Address)
+	signer := mustAddress(g.Address)
 
 	cases := []struct {
 		name string
@@ -205,7 +195,7 @@ func TestNonce(t *testing.T) {
 		t.Error("two NewNonce calls returned the same value")
 	}
 
-	got, err := NonceFromHex(hexutil.Encode(a[:]))
+	got, err := NonceFromHex(encodeHex(a[:]))
 	if err != nil {
 		t.Fatal(err)
 	}

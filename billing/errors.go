@@ -12,4 +12,7 @@ var (
 	ErrStaleTimestamp         = errors.New("request timestamp outside freshness window")
 	ErrTimestampOutOfRange    = errors.New("request timestamp exceeds int64 range")
 	ErrInvalidPoolAddress     = errors.New("pool_address must be a hex address")
+	ErrInvalidAddress         = errors.New("address must be 20 bytes")
+	ErrMissingHexPrefix       = errors.New("hex value must be 0x-prefixed")
+	ErrInvalidPrivateKey      = errors.New("private key must be 32 bytes")
 )

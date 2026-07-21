@@ -5,9 +5,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // TestCheckFreshness covers the replay-bounding window: a timestamp inside the
@@ -46,11 +43,11 @@ func TestCheckFreshness(t *testing.T) {
 // TestVerifyRequestRecoversPayer signs a request and confirms VerifyRequest
 // recomputes the matching hash and recovers the signer as the payer.
 func TestVerifyRequestRecoversPayer(t *testing.T) {
-	priv, err := crypto.GenerateKey()
+	priv, err := GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer := crypto.PubkeyToAddress(priv.PublicKey)
+	signer := PubkeyToAddress(priv.PubKey())
 	const chainID = 91273002
 	query := "query { Log { id } }"
 	vars := json.RawMessage(`{"limit":10}`)
@@ -72,7 +69,7 @@ func TestVerifyRequestRecoversPayer(t *testing.T) {
 // TestVerifyRequestRejectsTamperedQuery checks that serving a different query
 // than the one signed fails the hash binding.
 func TestVerifyRequestRejectsTamperedQuery(t *testing.T) {
-	priv, err := crypto.GenerateKey()
+	priv, err := GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +85,7 @@ func TestVerifyRequestRejectsTamperedQuery(t *testing.T) {
 // TestVerifyRequestRejectsTamperedVariables checks the variables are bound into
 // the hash, not just the query text.
 func TestVerifyRequestRejectsTamperedVariables(t *testing.T) {
-	priv, err := crypto.GenerateKey()
+	priv, err := GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,11 +102,11 @@ func TestVerifyRequestRejectsTamperedVariables(t *testing.T) {
 // the digest: verifying under a different chain recovers a different address, so
 // a signature cannot be replayed onto another chain.
 func TestVerifyRequestWrongChainDoesNotRecoverSigner(t *testing.T) {
-	priv, err := crypto.GenerateKey()
+	priv, err := GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer := crypto.PubkeyToAddress(priv.PublicKey)
+	signer := PubkeyToAddress(priv.PubKey())
 	ext, err := SignRequest(91273002, priv, "query { A }", nil, testPool, 1, 1735689600)
 	if err != nil {
 		t.Fatal(err)
@@ -129,18 +126,18 @@ func TestVerifyRequestWrongChainDoesNotRecoverSigner(t *testing.T) {
 // recovers a different address, so a host cannot be redirected to bill a pool
 // the payer never authorized.
 func TestVerifyRequestBindsPool(t *testing.T) {
-	priv, err := crypto.GenerateKey()
+	priv, err := GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer := crypto.PubkeyToAddress(priv.PublicKey)
+	signer := PubkeyToAddress(priv.PubKey())
 	query := "query { A }"
 
 	ext, err := SignRequest(91273002, priv, query, nil, testPool, 1, 1735689600)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ext.PoolAddress = common.HexToAddress("0x3333333333333333333333333333333333333333").Hex()
+	ext.PoolAddress = mustAddress("0x3333333333333333333333333333333333333333").Hex()
 
 	payer, err := VerifyRequest(91273002, query, nil, ext)
 	if err != nil {

@@ -8,41 +8,22 @@
 // chain id is 91273003 local, 91273002 devnet. The browser client signs the
 // same typed data with viem; the golden vector under testdata/golden gates that
 // a viem signature recovers here.
+//
+// The signing primitives (secp256k1, keccak256, addresses, hex) live in eth.go
+// and the EIP-712 digest in eip712.go, so the package carries no go-ethereum
+// dependency.
 package billing
 
 import (
-	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
-	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/signer/core/apitypes"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 const (
-	domainName    = "ShinzoQueryBilling"
-	domainVersion = "1"
-
 	hashSize  = 32
 	nonceSize = 32
-	sigSize   = 65
-
-	// sigVOffset converts crypto.Sign's raw recovery id (0/1) to the
-	// wallet-style v (27/28) used by viem and ecrecover.
-	sigVOffset = 27
-
-	// queryRequestType is the EIP-712 type name for QueryRequest. It must
-	// match the same literal the viem client signs against. Shared field and
-	// solidity-type names (eip712DomainType, fieldName, fieldQueryHash, etc.)
-	// are defined in response.go.
-	queryRequestType = "QueryRequest"
-
-	fieldNonce     = "nonce"
-	fieldTimestamp = "timestamp"
 )
 
 // QueryRequest is the EIP-712 message a client signs to authorize one billed
@@ -53,7 +34,7 @@ type QueryRequest struct {
 	QueryHash [hashSize]byte
 	Nonce     [nonceSize]byte
 	Timestamp uint64
-	Pool      common.Address
+	Pool      Address
 }
 
 // NewNonce returns 32 cryptographically random bytes for QueryRequest.Nonce.
@@ -68,7 +49,7 @@ func NewNonce() ([nonceSize]byte, error) {
 // NonceFromHex decodes a 0x-prefixed hex nonce and requires exactly 32 bytes, so
 // a malformed wire value cannot be padded into a different request silently.
 func NonceFromHex(s string) ([nonceSize]byte, error) {
-	b, err := hexutil.Decode(s)
+	b, err := decodeHex(s)
 	if err != nil {
 		return [nonceSize]byte{}, fmt.Errorf("decode nonce: %w", err)
 	}
@@ -82,73 +63,12 @@ func NonceFromHex(s string) ([nonceSize]byte, error) {
 
 // SignQueryRequest signs req for chainID with priv and returns a 65-byte
 // signature (r, s, v) with v as 27/28, matching wallet and viem output.
-func SignQueryRequest(chainID uint64, priv *ecdsa.PrivateKey, req QueryRequest) ([]byte, error) {
-	digest, err := requestDigest(chainID, req)
-	if err != nil {
-		return nil, err
-	}
-	sig, err := crypto.Sign(digest, priv)
-	if err != nil {
-		return nil, fmt.Errorf("sign query request: %w", err)
-	}
-	sig[sigSize-1] += sigVOffset
-	return sig, nil
+func SignQueryRequest(chainID uint64, priv *secp256k1.PrivateKey, req QueryRequest) []byte {
+	return sign(digest(chainID, requestStructHash(req)), priv)
 }
 
 // RecoverQueryRequest returns the address that signed req for chainID. It
 // accepts a recovery id of 27/28 or 0/1.
-func RecoverQueryRequest(chainID uint64, req QueryRequest, sig []byte) (common.Address, error) {
-	if len(sig) != sigSize {
-		return common.Address{}, fmt.Errorf("%w: got %d", ErrInvalidSignatureLength, len(sig))
-	}
-	digest, err := requestDigest(chainID, req)
-	if err != nil {
-		return common.Address{}, err
-	}
-	normalized := make([]byte, sigSize)
-	copy(normalized, sig)
-	if normalized[sigSize-1] >= sigVOffset {
-		normalized[sigSize-1] -= sigVOffset
-	}
-	pub, err := crypto.SigToPub(digest, normalized)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("recover query request signer: %w", err)
-	}
-	return crypto.PubkeyToAddress(*pub), nil
-}
-
-// requestDigest returns the EIP-712 signing digest for req under chainID.
-func requestDigest(chainID uint64, req QueryRequest) ([]byte, error) {
-	td := apitypes.TypedData{
-		Types: apitypes.Types{
-			eip712DomainType: {
-				{Name: fieldName, Type: solidityString},
-				{Name: fieldVersion, Type: solidityString},
-				{Name: fieldChainID, Type: solidityUint256},
-			},
-			queryRequestType: {
-				{Name: fieldQueryHash, Type: solidityBytes32},
-				{Name: fieldNonce, Type: solidityBytes32},
-				{Name: fieldTimestamp, Type: solidityUint256},
-				{Name: fieldPool, Type: solidityAddress},
-			},
-		},
-		PrimaryType: queryRequestType,
-		Domain: apitypes.TypedDataDomain{
-			Name:    domainName,
-			Version: domainVersion,
-			ChainId: (*math.HexOrDecimal256)(new(big.Int).SetUint64(chainID)),
-		},
-		Message: apitypes.TypedDataMessage{
-			fieldQueryHash: hexutil.Encode(req.QueryHash[:]),
-			fieldNonce:     hexutil.Encode(req.Nonce[:]),
-			fieldTimestamp: (*math.HexOrDecimal256)(new(big.Int).SetUint64(req.Timestamp)),
-			fieldPool:      req.Pool.Hex(),
-		},
-	}
-	digest, _, err := apitypes.TypedDataAndHash(td)
-	if err != nil {
-		return nil, fmt.Errorf("eip712 digest: %w", err)
-	}
-	return digest, nil
+func RecoverQueryRequest(chainID uint64, req QueryRequest, sig []byte) (Address, error) {
+	return recoverAddress(digest(chainID, requestStructHash(req)), sig)
 }
