@@ -10,12 +10,6 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// This file holds the Ethereum-flavored primitives the billing messages need,
-// re-implemented on decred's secp256k1 and x/crypto/sha3 so the package carries
-// no go-ethereum dependency. The wire format is unchanged: keccak256 hashing,
-// 20-byte addresses printed with the EIP-55 checksum, and 65-byte recoverable
-// signatures (r, s, v) with v as 27/28, matching viem and every EVM wallet.
-
 const (
 	addressSize = 20
 	sigSize     = 65
@@ -57,7 +51,7 @@ func mustAddress(s string) Address {
 // checksum, the canonical on-wire form. A hex letter is uppercased when the
 // matching nibble of keccak256(lowercase hex) is >= 8.
 func (a Address) Hex() string {
-	const checksumOn = 8 // EIP-55 threshold: uppercase when the hash nibble is >= 8
+	const checksumOn = 8
 
 	lower := hex.EncodeToString(a[:])
 	hash := keccak256([]byte(lower))
@@ -77,8 +71,8 @@ func (a Address) Hex() string {
 // even i, the low nibble for odd i.
 func hashNibble(h []byte, i int) byte {
 	const (
-		nibbleBits = 4    // bits per hex digit
-		nibbleMask = 0x0f // low nibble of a byte
+		nibbleBits = 4
+		nibbleMask = 0x0f
 	)
 	b := h[i/2]
 	if i%2 == 0 {

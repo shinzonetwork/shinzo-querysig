@@ -8,10 +8,6 @@
 // chain id is 91273003 local, 91273002 devnet. The browser client signs the
 // same typed data with viem; the golden vector under testdata/golden gates that
 // a viem signature recovers here.
-//
-// The signing primitives (secp256k1, keccak256, addresses, hex) live in eth.go
-// and the EIP-712 digest in eip712.go, so the package carries no go-ethereum
-// dependency.
 package billing
 
 import (

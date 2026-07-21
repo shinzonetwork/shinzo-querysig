@@ -2,12 +2,6 @@ package billing
 
 import "encoding/binary"
 
-// EIP-712 typed-data hashing for the two billing messages, written out directly
-// rather than through a generic encoder. Both schemas use only atomic types
-// (bytes32, uint256, address, string), so the struct hash is a fixed sequence of
-// 32-byte words. The type strings and field order must match what the viem
-// client signs; the golden vector in testdata/golden gates that they do.
-
 const (
 	domainName    = "ShinzoQueryBilling"
 	domainVersion = "1"
