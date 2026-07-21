@@ -29,17 +29,6 @@ const (
 // Address is a 20-byte Ethereum account address.
 type Address [addressSize]byte
 
-// bytesToAddress copies b right-aligned into an Address, matching how an address
-// is taken as the low 20 bytes of a keccak256 hash.
-func bytesToAddress(b []byte) Address {
-	var a Address
-	if len(b) > addressSize {
-		b = b[len(b)-addressSize:]
-	}
-	copy(a[addressSize-len(b):], b)
-	return a
-}
-
 // ParseAddress decodes a hex address with an optional 0x prefix. It requires
 // exactly 20 bytes so a malformed value cannot be silently padded into a
 // different address, and accepts any letter case (checksummed or not).
@@ -51,7 +40,7 @@ func ParseAddress(s string) (Address, error) {
 	if len(b) != addressSize {
 		return Address{}, fmt.Errorf("%w: got %d bytes", ErrInvalidAddress, len(b))
 	}
-	return bytesToAddress(b), nil
+	return Address(b), nil
 }
 
 // mustAddress parses a known-good literal address and panics otherwise. It is
@@ -162,17 +151,12 @@ func recoverAddress(digest, sig []byte) (Address, error) {
 // pubkeyBytesToAddress derives an address from a 65-byte uncompressed public key
 // (0x04 || X || Y): keccak256 of the 64-byte body, low 20 bytes.
 func pubkeyBytesToAddress(uncompressed []byte) Address {
-	return bytesToAddress(keccak256(uncompressed[1:])[12:])
+	return Address(keccak256(uncompressed[1:])[12:])
 }
 
 // PubkeyToAddress derives the address of a secp256k1 public key.
 func PubkeyToAddress(pub *secp256k1.PublicKey) Address {
 	return pubkeyBytesToAddress(pub.SerializeUncompressed())
-}
-
-// GenerateKey returns a fresh secp256k1 private key.
-func GenerateKey() (*secp256k1.PrivateKey, error) {
-	return secp256k1.GeneratePrivateKey()
 }
 
 // KeyFromHex loads a secp256k1 private key from a hex-encoded 32-byte scalar,

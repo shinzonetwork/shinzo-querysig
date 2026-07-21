@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 // testPool is a fixed non-zero pool address for the round-trip and envelope
@@ -94,7 +96,7 @@ func TestSignMatchesViem(t *testing.T) {
 }
 
 func TestSignRecoverRoundTrip(t *testing.T) {
-	priv, err := GenerateKey()
+	priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}

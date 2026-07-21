@@ -2,6 +2,8 @@ package billing
 
 import (
 	"testing"
+
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 func testResponse() QueryResponse {
@@ -16,7 +18,7 @@ func testResponse() QueryResponse {
 }
 
 func TestSignRecoverResponseRoundTrip(t *testing.T) {
-	priv, err := GenerateKey()
+	priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +39,7 @@ func TestSignRecoverResponseRoundTrip(t *testing.T) {
 // checks the signer no longer recovers, proving each field (and the chain id) is
 // part of the digest.
 func TestRecoverResponseBindsEveryField(t *testing.T) {
-	priv, err := GenerateKey()
+	priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}

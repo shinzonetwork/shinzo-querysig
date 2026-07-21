@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+
 	"github.com/shinzonetwork/shinzo-querysig/canonical"
 )
 
@@ -11,7 +13,7 @@ import (
 // signature recovers to the signer over exactly the query_hash, nonce, and
 // timestamp the envelope reports, which is what the host re-derives.
 func TestSignRequestRoundTrip(t *testing.T) {
-	priv, err := GenerateKey()
+	priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +47,7 @@ func TestSignRequestRoundTrip(t *testing.T) {
 // TestSignRequestQueryHashMatchesCanonical checks the envelope carries the same
 // hash the host will recompute from the query and variables.
 func TestSignRequestQueryHashMatchesCanonical(t *testing.T) {
-	priv, err := GenerateKey()
+	priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +68,7 @@ func TestSignRequestQueryHashMatchesCanonical(t *testing.T) {
 }
 
 func TestSignRequestFieldsWellFormed(t *testing.T) {
-	priv, err := GenerateKey()
+	priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +100,7 @@ func TestSignRequestFieldsWellFormed(t *testing.T) {
 // TestSignRequestPropagatesVariablesError checks a variable the canonical layer
 // rejects (>= 2^53) surfaces as an error rather than being signed.
 func TestSignRequestPropagatesVariablesError(t *testing.T) {
-	priv, err := GenerateKey()
+	priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +110,7 @@ func TestSignRequestPropagatesVariablesError(t *testing.T) {
 }
 
 func TestSignRequestNonceUnique(t *testing.T) {
-	priv, err := GenerateKey()
+	priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
