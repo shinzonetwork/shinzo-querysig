@@ -3,15 +3,14 @@ package billing
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 func testResponse() QueryResponse {
 	return QueryResponse{
 		QueryHash:        [32]byte{0x01},
-		Host:             common.HexToAddress("0x1111111111111111111111111111111111111111"),
-		Pool:             common.HexToAddress("0x2222222222222222222222222222222222222222"),
+		Host:             mustAddress("0x1111111111111111111111111111111111111111"),
+		Pool:             mustAddress("0x2222222222222222222222222222222222222222"),
 		RowsQueried:      42,
 		RespondedAt:      1735689600,
 		ResponseCidsHash: ResponseCidsHash(nil),
@@ -19,17 +18,14 @@ func testResponse() QueryResponse {
 }
 
 func TestSignRecoverResponseRoundTrip(t *testing.T) {
-	priv, err := crypto.GenerateKey()
+	priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := crypto.PubkeyToAddress(priv.PublicKey)
+	want := PubkeyToAddress(priv.PubKey())
 	const chainID = 91273002
 
-	sig, err := SignQueryResponse(chainID, priv, testResponse())
-	if err != nil {
-		t.Fatal(err)
-	}
+	sig := SignQueryResponse(chainID, priv, testResponse())
 	got, err := RecoverQueryResponse(chainID, testResponse(), sig)
 	if err != nil {
 		t.Fatal(err)
@@ -43,18 +39,15 @@ func TestSignRecoverResponseRoundTrip(t *testing.T) {
 // checks the signer no longer recovers, proving each field (and the chain id) is
 // part of the digest.
 func TestRecoverResponseBindsEveryField(t *testing.T) {
-	priv, err := crypto.GenerateKey()
+	priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer := crypto.PubkeyToAddress(priv.PublicKey)
+	signer := PubkeyToAddress(priv.PubKey())
 	const chainID = 91273002
 	base := testResponse()
 
-	sig, err := SignQueryResponse(chainID, priv, base)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sig := SignQueryResponse(chainID, priv, base)
 
 	cases := []struct {
 		name string

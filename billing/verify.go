@@ -6,9 +6,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	"github.com/shinzonetwork/shinzo-querysig/canonical"
 )
 
@@ -24,10 +21,11 @@ func (e Extensions) Request() (QueryRequest, []byte, error) {
 	if err != nil {
 		return QueryRequest{}, nil, fmt.Errorf("nonce: %w", err)
 	}
-	if !common.IsHexAddress(e.PoolAddress) {
+	pool, err := ParseAddress(e.PoolAddress)
+	if err != nil {
 		return QueryRequest{}, nil, fmt.Errorf("pool_address: %w", ErrInvalidPoolAddress)
 	}
-	sig, err := hexutil.Decode(e.RequestSignature)
+	sig, err := decodeHex(e.RequestSignature)
 	if err != nil {
 		return QueryRequest{}, nil, fmt.Errorf("request_signature: %w", err)
 	}
@@ -35,7 +33,7 @@ func (e Extensions) Request() (QueryRequest, []byte, error) {
 		QueryHash: queryHash,
 		Nonce:     nonce,
 		Timestamp: e.RequestTimestamp,
-		Pool:      common.HexToAddress(e.PoolAddress),
+		Pool:      pool,
 	}, sig, nil
 }
 
@@ -44,20 +42,20 @@ func (e Extensions) Request() (QueryRequest, []byte, error) {
 // was authorized), recovers the payer from the request signature for chainID,
 // and returns the payer address. ext is the signed envelope carried under the
 // request's "extensions".
-func VerifyRequest(chainID uint64, query string, variables json.RawMessage, ext Extensions) (common.Address, error) {
+func VerifyRequest(chainID uint64, query string, variables json.RawMessage, ext Extensions) (Address, error) {
 	req, sig, err := ext.Request()
 	if err != nil {
-		return common.Address{}, err
+		return Address{}, err
 	}
 
 	recomputed, _, err := canonical.QueryHash(query, variables)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("recompute query hash: %w", err)
+		return Address{}, fmt.Errorf("recompute query hash: %w", err)
 	}
 	if req.QueryHash != recomputed {
-		return common.Address{}, fmt.Errorf(
+		return Address{}, fmt.Errorf(
 			"%w: signed %s, computed %s",
-			ErrQueryHashMismatch, hexutil.Encode(req.QueryHash[:]), hexutil.Encode(recomputed[:]),
+			ErrQueryHashMismatch, encodeHex(req.QueryHash[:]), encodeHex(recomputed[:]),
 		)
 	}
 
@@ -86,7 +84,7 @@ func CheckFreshness(timestamp uint64, now time.Time, maxAge time.Duration) error
 
 // decodeHashBytes decodes a 0x-prefixed hex value and requires exactly 32 bytes.
 func decodeHashBytes(s string) ([hashSize]byte, error) {
-	b, err := hexutil.Decode(s)
+	b, err := decodeHex(s)
 	if err != nil {
 		return [hashSize]byte{}, err
 	}
