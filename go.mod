@@ -1,6 +1,6 @@
 module github.com/shinzonetwork/shinzo-querysig
 
-go 1.27.0
+go 1.27.3
 
 require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1
